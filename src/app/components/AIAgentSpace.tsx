@@ -1,31 +1,47 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Bot, Upload, FileText, CheckCircle2, Loader2, Sparkles, MessageSquare, Send } from 'lucide-react';
+import { Bot, Upload, FileText, CheckCircle2, Loader2, Sparkles, MessageSquare, Send, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { uploadDocument } from '@/lib/documentService';
+
+// Default tenant ID for document uploads (replace with real auth context)
+const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
 export const AIAgentSpace: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<{ role: 'ai' | 'user'; content: string }[]>([
     { role: 'ai', content: "Bonjour ! Je suis votre assistant IA spécialisé dans les appels d'offres. Déposez un document d'appel d'offres ici, et je l'analyserai pour vous, en extrairai les dates clés et vous aiderai à élaborer une stratégie de réponse." }
   ]);
   const [inputValue, setInputValue] = useState('');
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const droppedFile = acceptedFiles[0];
       setFile(droppedFile);
       setIsProcessing(true);
-      
-      // Simulate AI processing
-      setTimeout(() => {
-        setIsProcessing(false);
+      setUploadError(null);
+
+      try {
+        await uploadDocument(droppedFile, DEFAULT_TENANT_ID);
+
         setChatMessages(prev => [
           ...prev,
           { role: 'user', content: `Document téléchargé : ${droppedFile.name}` },
-          { role: 'ai', content: `J'ai analysé "${droppedFile.name}". Il semble s'agir d'un appel d'offres pour un projet de bâtiment commercial. \n\nPoints clés :\n- Date limite : 15 oct. 2026\n- Budget estimé : 2,4 M$\n- Exigences principales : Matériaux durables, achèvement en 12 mois.\n\nSouhaitez-vous que je rédige un plan de proposition basé sur vos précédentes offres gagnantes ?` }
+          { role: 'ai', content: `J'ai analysé "${droppedFile.name}". Le document a été enregistré avec succès dans la base de données.\n\nSouhaitez-vous que je rédige un plan de proposition basé sur vos précédentes offres gagnantes ?` }
         ]);
-      }, 3000);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Échec du téléchargement du document';
+        setUploadError(message);
+        setChatMessages(prev => [
+          ...prev,
+          { role: 'user', content: `Document téléchargé : ${droppedFile.name}` },
+          { role: 'ai', content: `Erreur lors du téléchargement de "${droppedFile.name}": ${message}. Veuillez réessayer.` }
+        ]);
+      } finally {
+        setIsProcessing(false);
+      }
     }
   }, []);
 
@@ -89,6 +105,25 @@ export const AIAgentSpace: React.FC = () => {
                   <Loader2 className="w-16 h-16 text-blue-500 animate-spin mb-4" />
                   <h3 className="text-lg font-bold text-slate-900 mb-2">Analyse du document en cours...</h3>
                   <p className="text-slate-500 text-sm max-w-xs">Recherche des exigences de conformité, des délais et de la portée du projet.</p>
+                </motion.div>
+              ) : file && uploadError ? (
+                <motion.div 
+                  key="error"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center text-center"
+                >
+                  <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center text-red-600 mb-4">
+                    <AlertCircle className="w-10 h-10" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">{file.name}</h3>
+                  <p className="text-red-500 text-sm mb-6">{uploadError}</p>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setFile(null); setUploadError(null); }}
+                    className="text-sm font-bold text-red-500 hover:text-red-600 px-4 py-2"
+                  >
+                    Réessayer
+                  </button>
                 </motion.div>
               ) : file ? (
                 <motion.div 
