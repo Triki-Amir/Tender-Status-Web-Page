@@ -1,9 +1,9 @@
--- Enable UUID extension if not already enabled
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Enable pgcrypto extension for UUID generation
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Create documents table
 CREATE TABLE IF NOT EXISTS documents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uploaded_by UUID,
     created_by UUID,
@@ -55,21 +55,29 @@ CREATE TRIGGER trigger_update_documents_updated_at
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can view documents in their tenant
+-- Note: In production, replace 'true' with proper tenant-based access control
+-- Example: USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid)
 CREATE POLICY documents_select_policy ON documents
     FOR SELECT
-    USING (true); -- For now, allow all reads. You can restrict based on auth.uid() and tenant_id
+    USING (true); -- TODO: Implement proper tenant-based access control
 
 -- Policy: Users can insert documents
+-- Note: In production, restrict based on authenticated user's tenant
+-- Example: WITH CHECK (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid)
 CREATE POLICY documents_insert_policy ON documents
     FOR INSERT
-    WITH CHECK (true); -- For now, allow all inserts. You can restrict based on auth.uid()
+    WITH CHECK (true); -- TODO: Implement proper tenant-based access control
 
 -- Policy: Users can update documents in their tenant
+-- Note: In production, restrict to user's tenant and optionally to documents they own
+-- Example: USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid)
 CREATE POLICY documents_update_policy ON documents
     FOR UPDATE
-    USING (true); -- For now, allow all updates. You can restrict based on auth.uid() and tenant_id
+    USING (true); -- TODO: Implement proper tenant-based access control
 
 -- Policy: Users can delete (soft delete) documents in their tenant
+-- Note: In production, restrict to user's tenant and optionally to documents they own
+-- Example: USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid)
 CREATE POLICY documents_delete_policy ON documents
     FOR DELETE
-    USING (true); -- For now, allow all deletes. You can restrict based on auth.uid() and tenant_id
+    USING (true); -- TODO: Implement proper tenant-based access control

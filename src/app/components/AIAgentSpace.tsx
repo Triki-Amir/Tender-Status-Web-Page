@@ -4,16 +4,10 @@ import { Bot, Upload, FileText, CheckCircle2, Loader2, Sparkles, MessageSquare, 
 import { motion, AnimatePresence } from 'motion/react';
 import { uploadDocument, uploadFileToStorage, Document as DocumentType } from '../../../utils/supabase/client';
 
-// Generate a simple UUID for tenant (in production, this should come from auth)
-const generateTenantId = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
-
-const DEFAULT_TENANT_ID = generateTenantId();
+// SECURITY NOTE: In production, tenant_id should come from authenticated user context
+// For demo purposes, we use a fixed tenant ID
+// TODO: Integrate with authentication system to get real tenant_id from user session
+const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 export const AIAgentSpace: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -33,9 +27,10 @@ export const AIAgentSpace: React.FC = () => {
       setUploadError(null);
       
       try {
-        // Generate storage path
+        // Generate unique storage path using crypto random UUID
         const timestamp = Date.now();
-        const storagePath = `documents/${DEFAULT_TENANT_ID}/${timestamp}_${droppedFile.name}`;
+        const randomSuffix = crypto.randomUUID().slice(0, 8);
+        const storagePath = `documents/${DEMO_TENANT_ID}/${timestamp}_${randomSuffix}_${droppedFile.name}`;
         
         // Upload file to Supabase Storage
         await uploadFileToStorage(droppedFile, storagePath);
@@ -46,7 +41,7 @@ export const AIAgentSpace: React.FC = () => {
           file_size: droppedFile.size,
           mime_type: droppedFile.type,
           language: 'fr',
-          tenant_id: DEFAULT_TENANT_ID,
+          tenant_id: DEMO_TENANT_ID,
         });
         
         setUploadedDocument(document);

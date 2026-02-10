@@ -2,6 +2,15 @@
 
 This document describes how to set up and configure the PostgreSQL database and Supabase Storage for the document upload feature in the Agent AI tab.
 
+## Security Notes
+
+⚠️ **Important Security Considerations:**
+
+1. **Row Level Security (RLS)**: The current RLS policies use `USING (true)` for demo purposes. In production, implement proper tenant-based access control.
+2. **Tenant ID**: Currently using a fixed demo tenant ID. In production, integrate with your authentication system to get tenant IDs from authenticated user sessions.
+3. **File Path Uniqueness**: Storage paths include UUID and timestamp to prevent collisions during concurrent uploads.
+4. **Environment Variables**: Ensure all required Supabase credentials are properly secured and not exposed in client-side code.
+
 ## Prerequisites
 
 - Supabase project with database and storage access
@@ -34,7 +43,7 @@ This will create:
 
 ```sql
 CREATE TABLE documents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     uploaded_by UUID,
     created_by UUID,
@@ -51,6 +60,8 @@ CREATE TABLE documents (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 ```
+
+**Note:** Uses `pgcrypto` extension's `gen_random_uuid()` for secure UUID generation instead of the deprecated `uuid-ossp` extension.
 
 ## Storage Setup
 
@@ -91,6 +102,23 @@ CREATE POLICY "Allow authenticated deletes"
 ON storage.objects FOR DELETE
 TO authenticated
 USING (bucket_id = 'documents');
+```
+
+### 3. Row Level Security (Production)
+
+⚠️ **The default RLS policies allow unrestricted access for demo purposes.** 
+
+For production, update the policies in the migration file to use proper tenant-based access control:
+
+```sql
+-- Example: Restrict access based on JWT tenant claim
+CREATE POLICY documents_select_policy ON documents
+    FOR SELECT
+    USING (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid);
+
+CREATE POLICY documents_insert_policy ON documents
+    FOR INSERT
+    WITH CHECK (tenant_id = (auth.jwt() ->> 'tenant_id')::uuid);
 ```
 
 ## Environment Variables

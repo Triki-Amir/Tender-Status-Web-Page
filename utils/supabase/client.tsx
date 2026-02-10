@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { projectId, publicAnonKey } from './info.tsx';
+import { SUPABASE_URL, API_BASE_URL } from './config.tsx';
 
-const supabaseUrl = `https://${projectId}.supabase.co`;
 const supabaseAnonKey = publicAnonKey;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(SUPABASE_URL, supabaseAnonKey);
 
 export interface Document {
   id: string;
@@ -38,8 +38,6 @@ export interface UpdateDocumentRequest {
   metadata?: Record<string, any>;
   updated_by?: string;
 }
-
-const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/server/make-server-d54e322d`;
 
 export const uploadDocument = async (request: UploadDocumentRequest): Promise<Document> => {
   const response = await fetch(`${API_BASE_URL}/upload-document`, {

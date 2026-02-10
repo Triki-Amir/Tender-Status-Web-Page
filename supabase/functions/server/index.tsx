@@ -6,10 +6,16 @@ import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 
 const app = new Hono();
 
-const supabaseClient = () => createClient(
-  Deno.env.get("SUPABASE_URL"),
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
-);
+const supabaseClient = () => {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  
+  if (!url || !key) {
+    throw new Error("Missing required environment variables: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
+  }
+  
+  return createClient(url, key);
+};
 
 // Enable logger
 app.use('*', logger(console.log));
@@ -41,9 +47,10 @@ app.post("/make-server-d54e322d/upload-document", async (c) => {
       return c.json({ error: "Missing required fields: filename and tenant_id" }, 400);
     }
 
-    // Generate a unique storage path
+    // Generate a unique storage path with UUID to prevent collisions
     const timestamp = Date.now();
-    const storage_path = `documents/${tenant_id}/${timestamp}_${filename}`;
+    const uuid = crypto.randomUUID();
+    const storage_path = `documents/${tenant_id}/${uuid}_${timestamp}_${filename}`;
 
     // Insert document record into database
     const supabase = supabaseClient();
