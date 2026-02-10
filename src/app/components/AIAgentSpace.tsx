@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Bot, Upload, FileText, CheckCircle2, Loader2, Sparkles, MessageSquare, Send, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { uploadDocument, uploadFileToStorage, Document as DocumentType } from '@/../../utils/supabase/client';
+import { uploadDocument, uploadFileToStorage, Document as DocumentType } from '../../../utils/supabase/client';
 
 // Generate a simple UUID for tenant (in production, this should come from auth)
 const generateTenantId = () => {
