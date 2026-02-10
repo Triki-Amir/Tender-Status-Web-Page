@@ -1,31 +1,68 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Bot, Upload, FileText, CheckCircle2, Loader2, Sparkles, MessageSquare, Send } from 'lucide-react';
+import { Bot, Upload, FileText, CheckCircle2, Loader2, Sparkles, MessageSquare, Send, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { uploadDocument, uploadFileToStorage, Document as DocumentType } from '../../../utils/supabase/client';
+
+// SECURITY NOTE: In production, tenant_id should come from authenticated user context
+// For demo purposes, we use a fixed tenant ID
+// TODO: Integrate with authentication system to get real tenant_id from user session
+const DEMO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 export const AIAgentSpace: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [uploadedDocument, setUploadedDocument] = useState<DocumentType | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<{ role: 'ai' | 'user'; content: string }[]>([
     { role: 'ai', content: "Bonjour ! Je suis votre assistant IA spécialisé dans les appels d'offres. Déposez un document d'appel d'offres ici, et je l'analyserai pour vous, en extrairai les dates clés et vous aiderai à élaborer une stratégie de réponse." }
   ]);
   const [inputValue, setInputValue] = useState('');
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const droppedFile = acceptedFiles[0];
       setFile(droppedFile);
       setIsProcessing(true);
+      setUploadError(null);
       
-      // Simulate AI processing
-      setTimeout(() => {
+      try {
+        // Generate unique storage path using crypto random UUID
+        const timestamp = Date.now();
+        const randomSuffix = crypto.randomUUID().slice(0, 8);
+        const storagePath = `documents/${DEMO_TENANT_ID}/${timestamp}_${randomSuffix}_${droppedFile.name}`;
+        
+        // Upload file to Supabase Storage
+        await uploadFileToStorage(droppedFile, storagePath);
+        
+        // Create document record in database
+        const document = await uploadDocument({
+          filename: droppedFile.name,
+          file_size: droppedFile.size,
+          mime_type: droppedFile.type,
+          language: 'fr',
+          tenant_id: DEMO_TENANT_ID,
+        });
+        
+        setUploadedDocument(document);
         setIsProcessing(false);
+        
+        // Add messages to chat
         setChatMessages(prev => [
           ...prev,
           { role: 'user', content: `Document téléchargé : ${droppedFile.name}` },
           { role: 'ai', content: `J'ai analysé "${droppedFile.name}". Il semble s'agir d'un appel d'offres pour un projet de bâtiment commercial. \n\nPoints clés :\n- Date limite : 15 oct. 2026\n- Budget estimé : 2,4 M$\n- Exigences principales : Matériaux durables, achèvement en 12 mois.\n\nSouhaitez-vous que je rédige un plan de proposition basé sur vos précédentes offres gagnantes ?` }
         ]);
-      }, 3000);
+      } catch (error) {
+        console.error('Upload error:', error);
+        setIsProcessing(false);
+        setUploadError(error instanceof Error ? error.message : 'Failed to upload document');
+        setChatMessages(prev => [
+          ...prev,
+          { role: 'user', content: `Tentative de téléchargement : ${droppedFile.name}` },
+          { role: 'ai', content: `Désolé, j'ai rencontré une erreur lors du téléchargement du document. Veuillez réessayer.` }
+        ]);
+      }
     }
   }, []);
 
@@ -97,17 +134,38 @@ export const AIAgentSpace: React.FC = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   className="flex flex-col items-center text-center"
                 >
-                  <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-4">
-                    <CheckCircle2 className="w-10 h-10" />
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-2">{file.name}</h3>
-                  <p className="text-slate-500 text-sm mb-6">Traité et indexé avec succès.</p>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                    className="text-sm font-bold text-red-500 hover:text-red-600 px-4 py-2"
-                  >
-                    Supprimer et télécharger un autre
-                  </button>
+                  {uploadError ? (
+                    <>
+                      <div className="w-20 h-20 bg-red-100 rounded-2xl flex items-center justify-center text-red-600 mb-4">
+                        <AlertCircle className="w-10 h-10" />
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900 mb-2">Erreur de téléchargement</h3>
+                      <p className="text-red-500 text-sm mb-6">{uploadError}</p>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setFile(null); setUploadError(null); }}
+                        className="text-sm font-bold text-blue-500 hover:text-blue-600 px-4 py-2"
+                      >
+                        Réessayer
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600 mb-4">
+                        <CheckCircle2 className="w-10 h-10" />
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900 mb-2">{file.name}</h3>
+                      <p className="text-slate-500 text-sm mb-2">Traité et indexé avec succès.</p>
+                      {uploadedDocument && (
+                        <p className="text-xs text-slate-400 mb-6">ID: {uploadedDocument.id}</p>
+                      )}
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setFile(null); setUploadedDocument(null); }}
+                        className="text-sm font-bold text-red-500 hover:text-red-600 px-4 py-2"
+                      >
+                        Supprimer et télécharger un autre
+                      </button>
+                    </>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div 
